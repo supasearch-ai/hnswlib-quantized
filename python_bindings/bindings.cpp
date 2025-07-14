@@ -4,6 +4,9 @@
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
 #include "hnswlib.h"
+#include "quantizer.h"
+#include "space_l2_int8.h"
+#include "space_ip_int8.h"
 #include <thread>
 #include <atomic>
 #include <stdlib.h>
@@ -170,8 +173,12 @@ class Index {
         } else if (space_name == "cosine") {
             l2space = new hnswlib::InnerProductSpace(dim);
             normalize = true;
+        } else if (space_name == "l2_int8") {
+            l2space = new hnswlib::L2SpaceInt8(dim);
+        } else if (space_name == "ip_int8") {
+            l2space = new hnswlib::InnerProductSpaceInt8(dim);
         } else {
-            throw std::runtime_error("Space name must be one of l2, ip, or cosine.");
+            throw std::runtime_error("Space name must be one of l2, ip, cosine, l2_int8, or ip_int8.");
         }
         appr_alg = NULL;
         ep_added = true;
@@ -198,6 +205,16 @@ class Index {
         if (appr_alg) {
             throw std::runtime_error("The index is already initiated.");
         }
+        
+        // Handle Int8 space re-initialization
+        bool int8_space = (space_name == "l2_int8" || space_name == "ip_int8");
+        if (int8_space) {
+            if (space_name == "l2_int8")
+                l2space = new hnswlib::L2SpaceInt8(dim);
+            else if (space_name == "ip_int8")
+                l2space = new hnswlib::InnerProductSpaceInt8(dim);
+        }
+        
         cur_l = 0;
         appr_alg = new hnswlib::HierarchicalNSW<dist_t>(l2space, maxElements, M, efConstruction, random_seed, allow_replace_deleted);
         index_inited = true;
@@ -266,6 +283,9 @@ class Index {
         }
 
         std::vector<size_t> ids = get_input_ids_and_check_shapes(ids_, rows);
+        
+        // Check for Int8 space
+        bool int8_space = (space_name == "l2_int8" || space_name == "ip_int8");
 
         {
             int start = 0;
@@ -277,13 +297,39 @@ class Index {
                     normalize_vector(vector_data, norm_array.data());
                     vector_data = norm_array.data();
                 }
-                appr_alg->addPoint((void*)vector_data, (size_t)id, replace_deleted);
+                
+                if (int8_space) {
+                    std::vector<char> qbuf(dim * sizeof(int8_t) + sizeof(float));
+                    int8_t* qv = reinterpret_cast<int8_t*>(qbuf.data());
+                    float scale = hnswlib::QuantizerI8::encode(vector_data, qv, dim);
+                    *reinterpret_cast<float*>(qv + dim) = scale;
+                    appr_alg->addPoint((void*)qbuf.data(), (size_t)id, replace_deleted);
+                } else {
+                    appr_alg->addPoint((void*)vector_data, (size_t)id, replace_deleted);
+                }
                 start = 1;
                 ep_added = true;
             }
 
             py::gil_scoped_release l;
-            if (normalize == false) {
+            if (int8_space) {
+                ParallelFor(start, rows, num_threads, [&](size_t row, size_t threadId) {
+                    std::vector<char> qbuf(dim * sizeof(int8_t) + sizeof(float));
+                    int8_t* qv = reinterpret_cast<int8_t*>(qbuf.data());
+                    float* vector_data = (float*)items.data(row);
+                    
+                    if (normalize) {
+                        std::vector<float> norm_array(dim);
+                        normalize_vector(vector_data, norm_array.data());
+                        vector_data = norm_array.data();
+                    }
+                    
+                    float scale = hnswlib::QuantizerI8::encode(vector_data, qv, dim);
+                    *reinterpret_cast<float*>(qv + dim) = scale;
+                    size_t id = ids.size() ? ids.at(row) : (cur_l + row);
+                    appr_alg->addPoint((void*)qbuf.data(), (size_t)id, replace_deleted);
+                });
+            } else if (normalize == false) {
                 ParallelFor(start, rows, num_threads, [&](size_t row, size_t threadId) {
                     size_t id = ids.size() ? ids.at(row) : (cur_l + row);
                     appr_alg->addPoint((void*)items.data(row), (size_t)id, replace_deleted);
@@ -638,8 +684,39 @@ class Index {
             // Warning: search with a filter works slow in python in multithreaded mode. For best performance set num_threads=1
             CustomFilterFunctor idFilter(filter);
             CustomFilterFunctor* p_idFilter = filter ? &idFilter : nullptr;
+            
+            // Check for Int8 space
+            bool int8_space = (space_name == "l2_int8" || space_name == "ip_int8");
 
-            if (normalize == false) {
+            if (int8_space) {
+                // For symmetric INT8 spaces, quantize query vectors before searching
+                ParallelFor(0, rows, num_threads, [&](size_t row, size_t threadId) {
+                    std::vector<char> qbuf(features * sizeof(int8_t) + sizeof(float));
+                    int8_t* qv = reinterpret_cast<int8_t*>(qbuf.data());
+                    float* vector_data = (float*)items.data(row);
+                    
+                    if (normalize) {
+                        std::vector<float> norm_array(features);
+                        normalize_vector(vector_data, norm_array.data());
+                        vector_data = norm_array.data();
+                    }
+                    
+                    float scale = hnswlib::QuantizerI8::encode(vector_data, qv, features);
+                    *reinterpret_cast<float*>(qv + features) = scale;
+                    
+                    std::priority_queue<std::pair<dist_t, hnswlib::labeltype >> result = appr_alg->searchKnn(
+                        (void*)qbuf.data(), k, p_idFilter);
+                    if (result.size() != k)
+                        throw std::runtime_error(
+                            "Cannot return the results in a contiguous 2D array. Probably ef or M is too small");
+                    for (int i = k - 1; i >= 0; i--) {
+                        auto& result_tuple = result.top();
+                        data_numpy_d[row * k + i] = result_tuple.first;
+                        data_numpy_l[row * k + i] = result_tuple.second;
+                        result.pop();
+                    }
+                });
+            } else if (normalize == false) {
                 ParallelFor(0, rows, num_threads, [&](size_t row, size_t threadId) {
                     std::priority_queue<std::pair<dist_t, hnswlib::labeltype >> result = appr_alg->searchKnn(
                         (void*)items.data(row), k, p_idFilter);

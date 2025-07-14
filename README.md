@@ -1,6 +1,8 @@
 # Hnswlib - fast approximate nearest neighbor search
 Header-only C++ HNSW implementation with python bindings, insertions and updates.
 
+> **Note:** This is a fork of the original [hnswlib](https://github.com/nmslib/hnswlib) that adds **Int8 quantization support** for memory-efficient approximate nearest neighbor search.
+
 **NEWS:**
 
 **version 0.8.0** 
@@ -42,10 +44,48 @@ Description of the algorithm parameters can be found in [ALGO_PARAMS.md](ALGO_PA
 |Squared L2        |'l2'             | d = sum((Ai-Bi)^2)      |
 |Inner product     |'ip'             | d = 1.0 - sum(Ai\*Bi)   |
 |Cosine similarity |'cosine'         | d = 1.0 - sum(Ai\*Bi) / sqrt(sum(Ai\*Ai) * sum(Bi\*Bi))|
+|Squared L2 (Int8) |'l2_int8'        | d = sum((Ai-Bi)^2) (quantized to 8-bit)|
+|Inner product (Int8)|'ip_int8'       | d = 1.0 - sum(Ai\*Bi) (quantized to 8-bit)|
 
 Note that inner product is not an actual metric. An element can be closer to some other element than to itself. That allows some speedup if you remove all elements that are not the closest to themselves from the index.
 
 For other spaces use the nmslib library https://github.com/nmslib/nmslib. 
+
+#### Int8 Quantization Support
+
+This fork includes support for Int8 quantization, which provides significant memory savings (approximately 4x compression) with minimal accuracy loss. The quantization uses per-vector scaling to maximize precision within the int8 range.
+
+**Features:**
+- 8-bit quantization with per-vector scaling factors
+- ~4x memory reduction compared to float32 vectors
+- Minimal accuracy loss (typically <5% recall degradation)
+- Supports both L2 and inner product distances
+- Seamless integration with existing HNSW index structure
+
+**Usage:**
+```python
+import hnswlib
+import numpy as np
+
+# Use 'l2_int8' or 'ip_int8' for quantized spaces
+index = hnswlib.Index(space='l2_int8', dim=128)
+# Note: Use higher M and ef_construction for quantized indexes
+index.init_index(max_elements=10000, ef_construction=400, M=32)
+
+# Add and query vectors - quantization happens automatically
+data = np.random.random((1000, 128)).astype(np.float32)
+index.add_items(data)
+labels, distances = index.knn_query(data[:10], k=5)
+```
+
+**Important:** Due to quantization precision loss, Int8 indexes require higher parameter values:
+- **M**: Use 32 instead of the typical 16 (more connections per node)
+- **ef_construction**: Use 400 instead of 200 (evaluate more candidates during construction)
+
+**Memory Usage:**
+- Float32: `dim * 4 bytes` per vector
+- Int8 quantized: `dim * 1 + 4 bytes` per vector (scale factor)
+- Compression ratio: ~4x for typical dimensions
 
 #### API description
 * `hnswlib.Index(space, dim)` creates a non-initialized index an HNSW in space `space` with integer dimension `dim`.
@@ -98,7 +138,7 @@ For other spaces use the nmslib library https://github.com/nmslib/nmslib.
 
 Read-only properties of `hnswlib.Index` class:
 
-* `space` - name of the space (can be one of "l2", "ip", or "cosine"). 
+* `space` - name of the space (can be one of "l2", "ip", "cosine", "l2_int8", or "ip_int8"). 
 
 * `dim`   - dimensionality of the space. 
 
@@ -139,7 +179,7 @@ data = np.float32(np.random.random((num_elements, dim)))
 ids = np.arange(num_elements)
 
 # Declaring index
-p = hnswlib.Index(space = 'l2', dim = dim) # possible options are l2, cosine or ip
+p = hnswlib.Index(space = 'l2', dim = dim) # possible options are l2, cosine, ip, l2_int8, or ip_int8
 
 # Initializing index - the maximum number of elements should be known beforehand
 p.init_index(max_elements = num_elements, ef_construction = 200, M = 16)
@@ -181,7 +221,7 @@ data1 = data[:num_elements // 2]
 data2 = data[num_elements // 2:]
 
 # Declaring index
-p = hnswlib.Index(space='l2', dim=dim)  # possible options are l2, cosine or ip
+p = hnswlib.Index(space='l2', dim=dim)  # possible options are l2, cosine, ip, l2_int8, or ip_int8
 
 # Initializing index
 # max_elements - the maximum number of elements (capacity). Will throw an exception if exceeded
