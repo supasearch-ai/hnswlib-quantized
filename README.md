@@ -1,5 +1,5 @@
-# Hnswlib - fast approximate nearest neighbor search
-Header-only C++ HNSW implementation with python bindings, insertions and updates.
+# qhnswlib - HNSW with Int8 Quantization
+Header-only C++ HNSW implementation with python bindings, insertions, updates, and **Int8 quantization support**.
 
 > **Note:** This is a fork of the original [hnswlib](https://github.com/nmslib/hnswlib) that adds **Int8 quantization support** for memory-efficient approximate nearest neighbor search.
 
@@ -64,11 +64,11 @@ This fork includes support for Int8 quantization, which provides significant mem
 
 **Usage:**
 ```python
-import hnswlib
+import qhnswlib
 import numpy as np
 
 # Use 'l2_int8' or 'ip_int8' for quantized spaces
-index = hnswlib.Index(space='l2_int8', dim=128)
+index = qhnswlib.Index(space='l2_int8', dim=128)
 # Note: Use higher M and ef_construction for quantized indexes
 index.init_index(max_elements=10000, ef_construction=400, M=32)
 
@@ -88,9 +88,9 @@ labels, distances = index.knn_query(data[:10], k=5)
 - Compression ratio: ~4x for typical dimensions
 
 #### API description
-* `hnswlib.Index(space, dim)` creates a non-initialized index an HNSW in space `space` with integer dimension `dim`.
+* `qhnswlib.Index(space, dim)` creates a non-initialized index an HNSW in space `space` with integer dimension `dim`.
 
-`hnswlib.Index` methods:
+`qhnswlib.Index` methods:
 * `init_index(max_elements, M = 16, ef_construction = 200, random_seed = 100, allow_replace_deleted = False)` initializes the index from with no elements. 
     * `max_elements` defines the maximum number of elements that can be stored in the structure(can be increased/shrunk).
     * `ef_construction` defines a construction time/accuracy trade-off (see [ALGO_PARAMS.md](ALGO_PARAMS.md)).
@@ -136,7 +136,7 @@ labels, distances = index.knn_query(data[:10], k=5)
 
 * `get_current_count()` - returns the current number of element stored in the index
 
-Read-only properties of `hnswlib.Index` class:
+Read-only properties of `qhnswlib.Index` class:
 
 * `space` - name of the space (can be one of "l2", "ip", "cosine", "l2_int8", or "ip_int8"). 
 
@@ -150,7 +150,7 @@ Read-only properties of `hnswlib.Index` class:
 
 * `element_count` - number of items in the index. Equivalent to `p.get_current_count()`. 
 
-Properties of `hnswlib.Index` that support reading and writing:
+Properties of `qhnswlib.Index` that support reading and writing:
 
 * `ef` - parameter controlling query time/accuracy trade-off.
 
@@ -167,7 +167,7 @@ Properties of `hnswlib.Index` that support reading and writing:
 
 An example of creating index, inserting elements, searching and pickle serialization:
 ```python
-import hnswlib
+import qhnswlib
 import numpy as np
 import pickle
 
@@ -179,7 +179,7 @@ data = np.float32(np.random.random((num_elements, dim)))
 ids = np.arange(num_elements)
 
 # Declaring index
-p = hnswlib.Index(space = 'l2', dim = dim) # possible options are l2, cosine, ip, l2_int8, or ip_int8
+p = qhnswlib.Index(space = 'l2', dim = dim) # possible options are l2, cosine, ip, l2_int8, or ip_int8
 
 # Initializing index - the maximum number of elements should be known beforehand
 p.init_index(max_elements = num_elements, ef_construction = 200, M = 16)
@@ -207,7 +207,7 @@ print(f"Search speed/quality trade-off parameter: ef={p_copy.ef}")
 
 An example with updates after serialization/deserialization:
 ```python
-import hnswlib
+import qhnswlib
 import numpy as np
 
 dim = 16
@@ -221,7 +221,7 @@ data1 = data[:num_elements // 2]
 data2 = data[num_elements // 2:]
 
 # Declaring index
-p = hnswlib.Index(space='l2', dim=dim)  # possible options are l2, cosine, ip, l2_int8, or ip_int8
+p = qhnswlib.Index(space='l2', dim=dim)  # possible options are l2, cosine, ip, l2_int8, or ip_int8
 
 # Initializing index
 # max_elements - the maximum number of elements (capacity). Will throw an exception if exceeded
@@ -257,7 +257,7 @@ p.save_index("first_half.bin")
 del p
 
 # Re-initializing, loading the index
-p = hnswlib.Index(space='l2', dim=dim)  # the space can be changed - keeps the data, alters the distance function.
+p = qhnswlib.Index(space='l2', dim=dim)  # the space can be changed - keeps the data, alters the distance function.
 
 print("\nLoading index from 'first_half.bin'\n")
 
@@ -287,13 +287,13 @@ print("Recall for two batches:", np.mean(labels.reshape(-1) == np.arange(len(dat
 You can install from sources:
 ```bash
 apt-get install -y python-setuptools python-pip
-git clone https://github.com/nmslib/hnswlib.git
-cd hnswlib
+git clone https://github.com/supasearch-ai/qhnswlib.git
+cd qhnswlib
 pip install .
 ```
 
 or you can install via pip:
-`pip install hnswlib`
+`pip install qhnswlib`
 
 
 ### For developers 

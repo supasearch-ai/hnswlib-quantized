@@ -151,6 +151,7 @@ class Index {
     static const int ser_version = 1;  // serialization version
 
     std::string space_name;
+    std::string quant;
     int dim;
     size_t seed;
     size_t default_ef;
@@ -164,21 +165,31 @@ class Index {
     hnswlib::SpaceInterface<float>* l2space;
 
 
-    Index(const std::string &space_name, const int dim) : space_name(space_name), dim(dim) {
+    Index(const std::string &space_name, const int dim, const std::string &quant = "none") 
+        : space_name(space_name), dim(dim), quant(quant) {
         normalize = false;
+        bool is_int8 = (quant == "int8");
+        
         if (space_name == "l2") {
-            l2space = new hnswlib::L2Space(dim);
+            if (is_int8) {
+                l2space = new hnswlib::L2SpaceInt8(dim);
+            } else {
+                l2space = new hnswlib::L2Space(dim);
+            }
         } else if (space_name == "ip") {
-            l2space = new hnswlib::InnerProductSpace(dim);
+            if (is_int8) {
+                l2space = new hnswlib::InnerProductSpaceInt8(dim);
+            } else {
+                l2space = new hnswlib::InnerProductSpace(dim);
+            }
         } else if (space_name == "cosine") {
+            if (is_int8) {
+                throw std::runtime_error("int8 quantization not yet supported for cosine space");
+            }
             l2space = new hnswlib::InnerProductSpace(dim);
             normalize = true;
-        } else if (space_name == "l2_int8") {
-            l2space = new hnswlib::L2SpaceInt8(dim);
-        } else if (space_name == "ip_int8") {
-            l2space = new hnswlib::InnerProductSpaceInt8(dim);
         } else {
-            throw std::runtime_error("Space name must be one of l2, ip, cosine, l2_int8, or ip_int8.");
+            throw std::runtime_error("Space name must be one of l2, ip, or cosine.");
         }
         appr_alg = NULL;
         ep_added = true;
@@ -204,15 +215,6 @@ class Index {
         bool allow_replace_deleted) {
         if (appr_alg) {
             throw std::runtime_error("The index is already initiated.");
-        }
-        
-        // Handle Int8 space re-initialization
-        bool int8_space = (space_name == "l2_int8" || space_name == "ip_int8");
-        if (int8_space) {
-            if (space_name == "l2_int8")
-                l2space = new hnswlib::L2SpaceInt8(dim);
-            else if (space_name == "ip_int8")
-                l2space = new hnswlib::InnerProductSpaceInt8(dim);
         }
         
         cur_l = 0;
@@ -284,8 +286,8 @@ class Index {
 
         std::vector<size_t> ids = get_input_ids_and_check_shapes(ids_, rows);
         
-        // Check for Int8 space
-        bool int8_space = (space_name == "l2_int8" || space_name == "ip_int8");
+        // Check for Int8 quantization
+        bool int8_space = (quant == "int8");
 
         {
             int start = 0;
@@ -512,6 +514,7 @@ class Index {
         auto params = py::dict(
             "ser_version"_a = py::int_(Index<float>::ser_version),  // serialization version
             "space"_a = space_name,
+            "quant"_a = quant,
             "dim"_a = dim,
             "index_inited"_a = index_inited,
             "ep_added"_a = ep_added,
@@ -535,8 +538,14 @@ class Index {
         auto space_name_ = d["space"].cast<std::string>();
         auto dim_ = d["dim"].cast<int>();
         auto index_inited_ = d["index_inited"].cast<bool>();
+        
+        // Handle backward compatibility - if quant is not in dict, default to "none"
+        std::string quant_ = "none";
+        if (d.contains("quant")) {
+            quant_ = d["quant"].cast<std::string>();
+        }
 
-        Index<float>* new_index = new Index<float>(space_name_, dim_);
+        Index<float>* new_index = new Index<float>(space_name_, dim_, quant_);
 
         /*  TODO: deserialize state of random generators into new_index->level_generator_ and new_index->update_probability_generator_  */
         /*        for full reproducibility / state of generators is serialized inside Index::getIndexParams                      */
@@ -685,8 +694,8 @@ class Index {
             CustomFilterFunctor idFilter(filter);
             CustomFilterFunctor* p_idFilter = filter ? &idFilter : nullptr;
             
-            // Check for Int8 space
-            bool int8_space = (space_name == "l2_int8" || space_name == "ip_int8");
+            // Check for Int8 quantization
+            bool int8_space = (quant == "int8");
 
             if (int8_space) {
                 // For symmetric INT8 spaces, quantize query vectors before searching
@@ -984,14 +993,14 @@ class BFIndex {
 };
 
 
-PYBIND11_PLUGIN(hnswlib) {
-        py::module m("hnswlib");
+PYBIND11_PLUGIN(qhnswlib) {
+        py::module m("qhnswlib");
 
         py::class_<Index<float>>(m, "Index")
         .def(py::init(&Index<float>::createFromParams), py::arg("params"))
            /* WARNING: Index::createFromIndex is not thread-safe with Index::addItems */
         .def(py::init(&Index<float>::createFromIndex), py::arg("index"))
-        .def(py::init<const std::string &, const int>(), py::arg("space"), py::arg("dim"))
+        .def(py::init<const std::string &, const int, const std::string &>(), py::arg("space"), py::arg("dim"), py::arg("quant") = "none")
         .def("init_index",
             &Index<float>::init_new_index,
             py::arg("max_elements"),
@@ -1028,6 +1037,7 @@ PYBIND11_PLUGIN(hnswlib) {
         .def("get_max_elements", &Index<float>::getMaxElements)
         .def("get_current_count", &Index<float>::getCurrentCount)
         .def_readonly("space", &Index<float>::space_name)
+        .def_readonly("quant", &Index<float>::quant)
         .def_readonly("dim", &Index<float>::dim)
         .def_readwrite("num_threads", &Index<float>::num_threads_default)
         .def_property("ef",
@@ -1063,7 +1073,7 @@ PYBIND11_PLUGIN(hnswlib) {
             }))
 
         .def("__repr__", [](const Index<float> &a) {
-            return "<hnswlib.Index(space='" + a.space_name + "', dim="+std::to_string(a.dim)+")>";
+            return "<qhnswlib.Index(space='" + a.space_name + "', quant='" + a.quant + "', dim="+std::to_string(a.dim)+")>";
         });
 
         py::class_<BFIndex<float>>(m, "BFIndex")
@@ -1081,7 +1091,7 @@ PYBIND11_PLUGIN(hnswlib) {
         .def("save_index", &BFIndex<float>::saveIndex, py::arg("path_to_index"))
         .def("load_index", &BFIndex<float>::loadIndex, py::arg("path_to_index"), py::arg("max_elements") = 0)
         .def("__repr__", [](const BFIndex<float> &a) {
-            return "<hnswlib.BFIndex(space='" + a.space_name + "', dim="+std::to_string(a.dim)+")>";
+            return "<qhnswlib.BFIndex(space='" + a.space_name + "', dim="+std::to_string(a.dim)+")>";
         })
         .def("get_max_elements", &BFIndex<float>::getMaxElements)
         .def("get_current_count", &BFIndex<float>::getCurrentCount)

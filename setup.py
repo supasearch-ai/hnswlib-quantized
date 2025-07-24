@@ -32,7 +32,7 @@ extra_objects = []
 
 ext_modules = [
     Extension(
-        'hnswlib',
+        'qhnswlib',
         source_files,
         include_dirs=include_dirs,
         libraries=libraries,
@@ -129,12 +129,12 @@ class BuildExt(build_ext):
 
 
 setup(
-    name='hnswlib',
+    name='qhnswlib',
     version=__version__,
-    description='hnswlib',
+    description='HNSW library with int8 quantization support',
     author='Yury Malkov and others',
-    url='https://github.com/yurymalkov/hnsw',
-    long_description="""hnsw""",
+    url='https://github.com/supasearch-ai/qhnswlib',
+    long_description="""Quantized HNSW library with int8 support for memory-efficient nearest neighbor search""",
     ext_modules=ext_modules,
     install_requires=['numpy'],
     cmdclass={'build_ext': BuildExt},
