@@ -1,25 +1,30 @@
-hnswlib.egg-info/
-build/
-dist/
-tmp/
-python_bindings/tests/__pycache__/
-*.pyd
-hnswlib.cpython*.so
-var/
-.idea/
-.vscode/
-.vs/
-**.DS_Store
-*.pyc
-
 # Build artifacts
 dist/
 build/
 *.egg-info/
 *.so
+*.pyd
 *.pyc
-__pycache__/
-.pytest_cache/
-venv/
 *.egg
 *.whl
+__pycache__/
+.pytest_cache/
+tmp/
+var/
+
+# Virtual environments
+venv/
+env/
+
+# IDE files
+.idea/
+.vscode/
+.vs/
+
+# OS files
+**.DS_Store
+
+# Specific to this project
+python_bindings/tests/__pycache__/
+qhnswlib.cpython*.so
+hnswlib.cpython*.so
