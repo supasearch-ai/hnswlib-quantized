@@ -11,3 +11,15 @@ var/
 .vs/
 **.DS_Store
 *.pyc
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+*.so
+*.pyc
+__pycache__/
+.pytest_cache/
+venv/
+*.egg
+*.whl
