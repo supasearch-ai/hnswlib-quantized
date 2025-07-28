@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.16.2
+        uses: pypa/cibuildwheel@v2.21.3
         env:
           # Build for Python 3.9-3.13 (modern versions only)
           CIBW_BUILD: cp39-* cp310-* cp311-* cp312-* cp313-*
