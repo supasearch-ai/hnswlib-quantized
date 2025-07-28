@@ -1,4 +1,4 @@
-import hnswlib
+import qhnswlib
 import numpy as np
 import threading
 import pickle
@@ -10,7 +10,7 @@ Example of python wrapper for hnswlib that supports python objects as ids
 
 class Index():
     def __init__(self, space, dim):
-        self.index = hnswlib.Index(space, dim)
+        self.index = qhnswlib.Index(space, dim)
         self.lock = threading.Lock()
         self.dict_labels = {}
         self.cur_ind = 0

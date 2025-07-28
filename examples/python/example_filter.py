@@ -1,4 +1,4 @@
-import hnswlib
+import qhnswlib
 import numpy as np
 
 
@@ -13,7 +13,7 @@ num_elements = 10000
 data = np.float32(np.random.random((num_elements, dim)))
 
 # Declaring index
-hnsw_index = hnswlib.Index(space='l2', dim=dim)  # possible options are l2, cosine or ip
+hnsw_index = qhnswlib.Index(space='l2', dim=dim)  # possible options are l2, cosine or ip
 
 # Initiating index
 # max_elements - the maximum number of elements, should be known beforehand

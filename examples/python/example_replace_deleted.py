@@ -1,4 +1,4 @@
-import hnswlib
+import qhnswlib
 import numpy as np
 
 
@@ -19,7 +19,7 @@ labels3 = np.arange(2 * num_elements, 3 * num_elements)
 data3 = np.float32(np.random.random((num_elements, dim)))  # batch 3
 
 # Declaring index
-hnsw_index = hnswlib.Index(space='l2', dim=dim)
+hnsw_index = qhnswlib.Index(space='l2', dim=dim)
 
 # Initiating index
 # max_elements - the maximum number of elements, should be known beforehand
