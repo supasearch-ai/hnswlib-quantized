@@ -35,7 +35,7 @@ jobs:
           
           # Test the built wheels
           CIBW_TEST_REQUIRES: numpy
-          CIBW_TEST_COMMAND: python -c "import qhnswlib; print('✓ qhnswlib imported successfully')"
+          CIBW_TEST_COMMAND: python -c "import qhnswlib; print('qhnswlib imported successfully')"
 
       - uses: actions/upload-artifact@v4
         with:
