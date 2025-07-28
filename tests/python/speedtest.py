@@ -1,4 +1,4 @@
-import hnswlib
+import qhnswlib
 import numpy as np
 import os.path
 import time
@@ -22,7 +22,7 @@ data = np.float32(np.random.random((num_elements, dim)))
 
 # index_path=f'speed_index{dim}.bin'
 # Declaring index
-p = hnswlib.Index(space='l2', dim=dim)  # possible options are l2, cosine or ip
+p = qhnswlib.Index(space='l2', dim=dim)  # possible options are l2, cosine or ip
 
 # if not os.path.isfile(index_path) :
 

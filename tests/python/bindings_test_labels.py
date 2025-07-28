@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-import hnswlib
+import qhnswlib
 
 
 class RandomSelfTestCase(unittest.TestCase):
@@ -19,7 +19,7 @@ class RandomSelfTestCase(unittest.TestCase):
             data = np.float32(np.random.random((num_elements, dim)))
 
             # Declaring index
-            p = hnswlib.Index(space='l2', dim=dim)  # possible options are l2, cosine or ip
+            p = qhnswlib.Index(space='l2', dim=dim)  # possible options are l2, cosine or ip
 
             # Initiating index
             # max_elements - the maximum number of elements, should be known beforehand
@@ -69,7 +69,7 @@ class RandomSelfTestCase(unittest.TestCase):
             print("\n**** Mark delete test ****\n")
             # Re-initiating, loading the index
             print("Re-initiating")
-            p = hnswlib.Index(space='l2', dim=dim)
+            p = qhnswlib.Index(space='l2', dim=dim)
 
             print("\nLoading index from '%s'\n" % index_path)
             p.load_index(index_path)
@@ -114,7 +114,7 @@ class RandomSelfTestCase(unittest.TestCase):
             # Checking saving/loading index with elements marked as deleted
             del_index_path = "with_deleted.bin"
             p.save_index(del_index_path)
-            p = hnswlib.Index(space='l2', dim=dim)
+            p = qhnswlib.Index(space='l2', dim=dim)
             p.load_index(del_index_path)
             p.set_ef(100)
 

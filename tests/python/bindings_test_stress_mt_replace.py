@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-import hnswlib
+import qhnswlib
 
 
 class RandomSelfTestCase(unittest.TestCase):
@@ -30,7 +30,7 @@ class RandomSelfTestCase(unittest.TestCase):
 
         for _ in range(100):
             # Declaring index
-            hnsw_index = hnswlib.Index(space='l2', dim=dim)
+            hnsw_index = qhnswlib.Index(space='l2', dim=dim)
             hnsw_index.init_index(max_elements=max_num_elements, ef_construction=200, M=16, allow_replace_deleted=True)
 
             hnsw_index.set_ef(100)

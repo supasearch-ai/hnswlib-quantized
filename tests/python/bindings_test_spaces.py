@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-import hnswlib
+import qhnswlib
 
 class RandomSelfTestCase(unittest.TestCase):
     def testRandomSelf(self):
@@ -24,7 +24,7 @@ class RandomSelfTestCase(unittest.TestCase):
                     data2 = np.concatenate(
                         [np.zeros([data1.shape[0], leftdim]), data1, np.zeros([data1.shape[0], rightdim])], axis=1)
                     dim = data2.shape[1]
-                    p = hnswlib.Index(space=space, dim=dim)
+                    p = qhnswlib.Index(space=space, dim=dim)
                     p.init_index(max_elements=5, ef_construction=100, M=16)
 
                     p.set_ef(10)

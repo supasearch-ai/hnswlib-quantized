@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-import hnswlib
+import qhnswlib
 
 
 def get_dist(metric, pt1, pt2):
@@ -55,7 +55,7 @@ def test_space_main(self, space, dim):
     test_data = np.float32(np.random.random((self.num_test_elements, dim)))
 
     # Declaring index
-    p = hnswlib.Index(space=space, dim=dim)  # possible options are l2, cosine or ip
+    p = qhnswlib.Index(space=space, dim=dim)  # possible options are l2, cosine or ip
     print(f"Running pickle tests for {p}")
 
     p.num_threads = self.num_threads  # by default using all available cores

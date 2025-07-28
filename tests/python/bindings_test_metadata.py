@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-import hnswlib
+import qhnswlib
 
 
 class RandomSelfTestCase(unittest.TestCase):
@@ -15,7 +15,7 @@ class RandomSelfTestCase(unittest.TestCase):
         data = np.float32(np.random.random((num_elements, dim)))
 
         # Declaring index
-        p = hnswlib.Index(space='l2', dim=dim)  # possible options are l2, cosine or ip
+        p = qhnswlib.Index(space='l2', dim=dim)  # possible options are l2, cosine or ip
 
         # Initing index
         # max_elements - the maximum number of elements, should be known beforehand

@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-import hnswlib
+import qhnswlib
 
 
 class RandomSelfTestCase(unittest.TestCase):
@@ -43,7 +43,7 @@ class RandomSelfTestCase(unittest.TestCase):
         data4 = np.float32(np.random.random((num_elements, dim)))
 
         # Declaring index
-        hnsw_index = hnswlib.Index(space='l2', dim=dim)
+        hnsw_index = qhnswlib.Index(space='l2', dim=dim)
         hnsw_index.init_index(max_elements=max_num_elements, ef_construction=200, M=16, allow_replace_deleted=True)
 
         hnsw_index.set_ef(100)
@@ -112,7 +112,7 @@ class RandomSelfTestCase(unittest.TestCase):
         del hnsw_index
 
         # Reinit and load the index
-        hnsw_index = hnswlib.Index(space='l2', dim=dim)  # the space can be changed - keeps the data, alters the distance function.
+        hnsw_index = qhnswlib.Index(space='l2', dim=dim)  # the space can be changed - keeps the data, alters the distance function.
         hnsw_index.set_num_threads(4)
         print(f"Loading index from {index_path}")
         hnsw_index.load_index(index_path, max_elements=max_num_elements, allow_replace_deleted=True)
@@ -187,12 +187,12 @@ class RandomSelfTestCase(unittest.TestCase):
         query_data = np.float32(np.random.random((query_size, dim)))
 
         # Declaring index
-        hnsw_index_no_replace = hnswlib.Index(space='l2', dim=dim)
+        hnsw_index_no_replace = qhnswlib.Index(space='l2', dim=dim)
         hnsw_index_no_replace.init_index(max_elements=max_num_elements, ef_construction=200, M=16, allow_replace_deleted=False)
-        hnsw_index_with_replace = hnswlib.Index(space='l2', dim=dim)
+        hnsw_index_with_replace = qhnswlib.Index(space='l2', dim=dim)
         hnsw_index_with_replace.init_index(max_elements=max_num_elements, ef_construction=200, M=16, allow_replace_deleted=True)
 
-        bf_index = hnswlib.BFIndex(space='l2', dim=dim)
+        bf_index = qhnswlib.BFIndex(space='l2', dim=dim)
         bf_index.init_index(max_elements=max_num_elements)
 
         hnsw_index_no_replace.set_ef(100)
