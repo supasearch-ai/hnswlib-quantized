@@ -184,9 +184,10 @@ class Index {
             }
         } else if (space_name == "cosine") {
             if (is_int8) {
-                throw std::runtime_error("int8 quantization not yet supported for cosine space");
+                l2space = new hnswlib::InnerProductSpaceInt8(dim);
+            } else {
+                l2space = new hnswlib::InnerProductSpace(dim);
             }
-            l2space = new hnswlib::InnerProductSpace(dim);
             normalize = true;
         } else {
             throw std::runtime_error("Space name must be one of l2, ip, or cosine.");
@@ -304,7 +305,7 @@ class Index {
                     std::vector<char> qbuf(dim * sizeof(int8_t) + sizeof(float));
                     int8_t* qv = reinterpret_cast<int8_t*>(qbuf.data());
                     float scale = hnswlib::QuantizerI8::encode(vector_data, qv, dim);
-                    *reinterpret_cast<float*>(qv + dim) = scale;
+                    memcpy(qv + dim, &scale, sizeof(float));
                     appr_alg->addPoint((void*)qbuf.data(), (size_t)id, replace_deleted);
                 } else {
                     appr_alg->addPoint((void*)vector_data, (size_t)id, replace_deleted);
@@ -327,7 +328,7 @@ class Index {
                     }
                     
                     float scale = hnswlib::QuantizerI8::encode(vector_data, qv, dim);
-                    *reinterpret_cast<float*>(qv + dim) = scale;
+                    memcpy(qv + dim, &scale, sizeof(float));
                     size_t id = ids.size() ? ids.at(row) : (cur_l + row);
                     appr_alg->addPoint((void*)qbuf.data(), (size_t)id, replace_deleted);
                 });
@@ -711,7 +712,7 @@ class Index {
                     }
                     
                     float scale = hnswlib::QuantizerI8::encode(vector_data, qv, features);
-                    *reinterpret_cast<float*>(qv + features) = scale;
+                    memcpy(qv + features, &scale, sizeof(float));
                     
                     std::priority_queue<std::pair<dist_t, hnswlib::labeltype >> result = appr_alg->searchKnn(
                         (void*)qbuf.data(), k, p_idFilter);

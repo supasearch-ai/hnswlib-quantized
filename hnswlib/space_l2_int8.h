@@ -1,6 +1,7 @@
 #pragma once
 #include "hnswlib.h"
 #include <cstdint>
+#include <cstring>
 
 namespace hnswlib {
 
@@ -9,23 +10,23 @@ static float L2SqrInt8(const void *pVect1v, const void *pVect2v, const void *qty
     const int8_t *v2 = reinterpret_cast<const int8_t *>(pVect2v);
     size_t dim = *(reinterpret_cast<const size_t *>(qty_ptr));
     
-    // Extract scales stored after int8 arrays
-    const float *s1_ptr = reinterpret_cast<const float *>(v1 + dim);
-    const float *s2_ptr = reinterpret_cast<const float *>(v2 + dim);
-    float s1 = *s1_ptr, s2 = *s2_ptr;
+    // Extract scales stored after int8 arrays using memcpy to avoid alignment issues
+    float s1, s2;
+    memcpy(&s1, v1 + dim, sizeof(float));
+    memcpy(&s2, v2 + dim, sizeof(float));
     
-    // Compute in int32 to avoid overflow
-    int32_t dot = 0, norm1_sq = 0, norm2_sq = 0;
+    // Compute in int64 to avoid overflow
+    int64_t dot = 0, norm1_sq = 0, norm2_sq = 0;
     for (size_t i = 0; i < dim; ++i) {
-        int32_t a = static_cast<int32_t>(v1[i]);
-        int32_t b = static_cast<int32_t>(v2[i]);
+        int64_t a = static_cast<int64_t>(v1[i]);
+        int64_t b = static_cast<int64_t>(v2[i]);
         dot += a * b;
         norm1_sq += a * a;
         norm2_sq += b * b;
     }
     
     // Apply scaling: ||a||² + ||b||² - 2(a·b)
-    return s1 * s1 * norm1_sq + s2 * s2 * norm2_sq - 2.f * s1 * s2 * dot;
+    return s1 * s1 * static_cast<float>(norm1_sq) + s2 * s2 * static_cast<float>(norm2_sq) - 2.f * s1 * s2 * static_cast<float>(dot);
 }
 
 class L2SpaceInt8 : public SpaceInterface<float> {
