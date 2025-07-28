@@ -21,7 +21,7 @@ jobs:
       - name: Test
         timeout-minutes: 15
         run: |
-          python -m unittest discover -v --start-directory examples/python --pattern "example*.py"
+          cd examples/python && python example.py && python example_filter.py && python example_replace_deleted.py && python example_search.py && python example_serialization.py && cd ../..
           python -m unittest discover -v --start-directory tests/python --pattern "bindings_test*.py"
   
   test_cpp:
