@@ -353,6 +353,27 @@ class Index {
     }
 
 
+    std::vector<data_t> getDequantizedVector(hnswlib::labeltype label) {
+        // Dequantize int8 vector back to float32
+        if (appr_alg->label_lookup_.find(label) == appr_alg->label_lookup_.end()) {
+            throw std::runtime_error("Label not found");
+        }
+        hnswlib::tableint internal_id = appr_alg->label_lookup_.at(label);
+        char* data_ptr = appr_alg->data_level0_memory_ + internal_id * appr_alg->size_data_per_element_ + appr_alg->offsetData_;
+        
+        // Extract int8 vector and scale, then dequantize
+        int8_t* int8_data = reinterpret_cast<int8_t*>(data_ptr);
+        float scale;
+        memcpy(&scale, data_ptr + dim, sizeof(float));
+        
+        // Dequantize to float32
+        std::vector<data_t> result(dim);
+        for (size_t i = 0; i < dim; i++) {
+            result[i] = static_cast<data_t>(int8_data[i]) * scale;
+        }
+        return result;
+    }
+
     py::object getData(py::object ids_ = py::none(), std::string return_type = "numpy") {
         std::vector<std::string> return_types{"numpy", "list"};
         if (std::find(std::begin(return_types), std::end(return_types), return_type) == std::end(return_types)) {
@@ -376,7 +397,11 @@ class Index {
 
         std::vector<std::vector<data_t>> data;
         for (auto id : ids) {
-            data.push_back(appr_alg->template getDataByLabel<data_t>(id));
+            if (quant == "int8") {
+                data.push_back(getDequantizedVector(id));
+            } else {
+                data.push_back(appr_alg->template getDataByLabel<data_t>(id));
+            }
         }
         if (return_type == "list") {
             return py::cast(data);
@@ -384,6 +409,31 @@ class Index {
         if (return_type == "numpy") {
             return py::array_t< data_t, py::array::c_style | py::array::forcecast >(py::cast(data));
         }
+        return py::none();
+    }
+
+
+    py::object getQuantizedData(const std::vector<hnswlib::labeltype>& ids) {
+        if (quant != "int8") {
+            throw std::runtime_error("get_quantized_items only works with int8 quantized indexes");
+        }
+
+        py::list result;
+        for (auto id : ids) {
+            // Access raw internal data directly for int8
+            if (appr_alg->label_lookup_.find(id) == appr_alg->label_lookup_.end()) {
+                throw std::runtime_error("Label not found");
+            }
+            hnswlib::tableint internal_id = appr_alg->label_lookup_.at(id);
+            char* data_ptr = appr_alg->data_level0_memory_ + internal_id * appr_alg->size_data_per_element_ + appr_alg->offsetData_;
+            
+            // Extract Int8 vector and scale
+            py::array_t<int8_t> vec({dim}, {sizeof(int8_t)}, reinterpret_cast<int8_t*>(data_ptr));
+            float scale;
+            memcpy(&scale, data_ptr + dim, sizeof(float));
+            result.append(py::make_tuple(vec, scale));
+        }
+        return result;
     }
 
 
@@ -971,10 +1021,10 @@ class BFIndex {
         }
 
         py::capsule free_when_done_l(data_numpy_l, [](void *f) {
-            delete[] f;
+            delete[] reinterpret_cast<hnswlib::labeltype*>(f);
         });
         py::capsule free_when_done_d(data_numpy_d, [](void *f) {
-            delete[] f;
+            delete[] reinterpret_cast<dist_t*>(f);
         });
 
 
@@ -1022,6 +1072,7 @@ PYBIND11_PLUGIN(qhnswlib) {
             py::arg("num_threads") = -1,
             py::arg("replace_deleted") = false)
         .def("get_items", &Index<float>::getData, py::arg("ids") = py::none(), py::arg("return_type") = "numpy")
+        .def("get_quantized_items", &Index<float>::getQuantizedData, py::arg("ids"))
         .def("get_ids_list", &Index<float>::getIdsList)
         .def("set_ef", &Index<float>::set_ef, py::arg("ef"))
         .def("set_num_threads", &Index<float>::set_num_threads, py::arg("num_threads"))
